@@ -1,0 +1,56 @@
+name: Android Build
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Build with Gradle
+      run: ./gradlew assembleDebug
+
+    - name: Sign Android Release
+      # Only sign if it's a build that needs to be installed, for now we just use debug key for simplicity
+      # or we can use a generated key.
+      # To make it installable on most devices without "unknown sources" warning from debug key is hard without a valid cert.
+      # But usually debug APK is fine for "installable on phone" requirement if user enables developer options.
+      # However, let's create a self-signed key to show we can do it.
+      id: sign_app
+      run: |
+        keytool -genkey -v -keystore my-release-key.keystore -alias my-key-alias -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=VpnDetector, OU=Development, O=Company, L=City, S=State, C=US" -storepass password -keypass password
+        ./gradlew assembleRelease
+        # Sign the release APK
+        # We need build-tools for apksigner. Android SDK is installed in github runner.
+        $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | sort | tail -1)/apksigner sign --ks my-release-key.keystore --ks-key-alias my-key-alias --ks-pass pass:password --key-pass pass:password --out app/build/outputs/apk/release/app-release-signed.apk app/build/outputs/apk/release/app-release-unsigned.apk
+      continue-on-error: true # Fallback to debug apk if this fails (e.g. apksigner not found or build fails)
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-debug
+        path: app/build/outputs/apk/debug/app-debug.apk
+
+    - name: Upload Signed Release APK
+      if: steps.sign_app.outcome == 'success'
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-release-signed
+        path: app/build/outputs/apk/release/app-release-signed.apk

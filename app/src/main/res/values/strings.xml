@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">VpnDetector</string>
+    <string name="check_vpn">Check VPN Status</string>
+    <string name="vpn_active">VPN is Active</string>
+    <string name="vpn_inactive">VPN is NOT Active</string>
+    <string name="vpn_details">Details: %s</string>
+</resources>
